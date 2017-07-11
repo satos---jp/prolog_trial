@@ -2,7 +2,7 @@ open Syntax
 open Eval
 
 let rec repl env = 
-	print_string "# ";
+	print_string "?- ";
 	flush stdout;
 	try
 		let dir = Parser.repl Lexer.token (Lexing.from_channel stdin) in

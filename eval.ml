@@ -73,16 +73,24 @@ let rec find_pat_fvs pa =
 	| Param x -> [x]
 
 
+let rec unique v = 
+	match v with
+	| [] -> []
+	| x :: xs -> 
+		let rv = unique xs in
+			if List.mem x rv then rv else (x :: rv)
+
+
+
 let rec find_func_fvs (fn,xs) = 
-	List.sort_uniq (fun s ->fun t -> if s = t then 0 else (if s < t then -1 else 1)) (List.flatten (List.map find_pat_fvs xs))
+	unique (List.flatten (List.map find_pat_fvs xs))
 
 let extract_subst sub func = 
 	let fvs = find_func_fvs func in
 		List.map (fun x -> (x,subst_pattern_rec sub (Param(x)))) fvs
 
 let rec find_decl_fvs (fn,xs) = 
-	List.sort_uniq (fun s ->fun t -> if s = t then 0 else (if s < t then -1 else 1)) 
-		((find_func_fvs fn) @ (List.flatten (List.map find_func_fvs xs)))
+	unique ((find_func_fvs fn) @ (List.flatten (List.map find_func_fvs xs)))
 
 
 let subst_patterns sub (pas : pattern list) = List.map (fun pa -> subst_pattern_rec sub pa) pas
@@ -103,7 +111,7 @@ let rec unify_pattern : pattern -> pattern -> subst option = fun x -> fun y ->
 	print_pattern y;
 	print_newline (); *)
 	match x,y with
-	| Param a, b | b,Param a -> Some [(a,b)]
+	| Param a, b | b,Param a -> Some [(a,b)] (* とりあえず、出現チェックをしない *)
 	| Const (x,xs), Const(y,ys) -> 
 		if x = y then unify_patterns xs ys else None
 

@@ -5,3 +5,5 @@
 !*.mly
 !Makefile
 !OCamlMakefile
+lexer.ml
+parser.ml

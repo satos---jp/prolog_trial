@@ -26,12 +26,12 @@
 %%
 
 repl:
-	| SHARP directive COLON { $2 }
+	| directive COLON { $1 }
 	| func COLON      { Query($1) }
 	| EOF  { Quit }
 
 directive:
-	| LOAD BLPAR QUOTE FILENAME QUOTE BRPAR { Load($4) }
+	| BLPAR QUOTE FILENAME QUOTE BRPAR { Load($3) }
 	| LIST { List }
 
 
