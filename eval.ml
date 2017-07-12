@@ -10,19 +10,54 @@ let rec load s env =
 	"", s @ env
 
 
-let subst_assoc = List.append
+let subst_assoc a b = List.append b a
 
-let rec print_pattern pa = 
+
+let rec listpattern2list pa = 
 	match pa with
-	| Const(x,xs) -> 
-		(match xs with
-		 | [] -> print_string x
-		 | r :: rs -> 
-			print_string (x ^ "(");
-			print_pattern r;
-			List.iter (fun x -> print_string ","; print_pattern x) rs;
-			print_string ")")
-	| Param(p) -> print_string p
+	| Const("@cons",[a;b]) -> 
+		(match listpattern2list b with
+		 | None -> None
+		 | Some xs -> Some (a :: xs))
+	| Const("@nil",[]) -> Some []
+	| _ -> None
+
+
+let rec print_pattern_list_rest v = 
+	match v with
+	| [] -> print_string "]"
+	| [x] -> 
+		print_pattern x;
+		print_string "]"
+	| x :: xs -> 
+		print_pattern x;
+		print_string ",";
+		print_pattern_list_rest xs
+
+and print_pattern pa = 
+	match listpattern2list pa with
+	| Some v -> 
+		print_string "[";
+		print_pattern_list_rest v
+	| None -> (
+		match pa with
+		| Const("@cons",[a;b]) -> 
+		print_string "[";
+		print_pattern a;
+		print_string "|";
+		print_pattern b;
+		print_string "]"
+		| Const(x,xs) -> 
+			(match xs with
+			 | [] -> print_string x
+			 | r :: rs -> 
+				print_string (x ^ "(");
+				print_pattern r;
+				List.iter (fun x -> print_string ","; print_pattern x) rs;
+				print_string ")")
+		| Param(p) -> print_string p)
+
+
 
 let print_func (na,pas) = 
 	print_string (na ^ "(");
@@ -159,14 +194,15 @@ let fleshen_decl decl =
 *)
 
 let rec iter_dfs (funs: func list) (subst : subst) (env :env) cont = 
-	(*
+	
 	print_subst subst;
 	print_newline ();
 	print_string (string_of_int (List.length funs));
 	print_newline ();
 	print_funcs funs;
 	print_newline ();
-	print_newline (); *)
+	print_newline (); 
+	
 	match funs with
 	| [] -> cont subst
 	| (fn,fvs) :: xs -> 

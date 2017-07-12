@@ -18,6 +18,7 @@
 %token <string> FILENAME
 %token EOF
 %token LIST
+%token VERT
 
 %start repl decls
 %type <Syntax.direct> repl
@@ -57,6 +58,10 @@ funcrest:
 pattern:
 	| param { $1 }
 	| const { $1 }
+	| concat { $1 }
+	| nilpat { $1 }
+	| listpat { $1 }
+
 
 const:
 	| CONST { Const($1,[]) }
@@ -68,3 +73,21 @@ constrest:
 
 param:
 	| PARAM { Param($1) }
+
+concat:
+	| BLPAR pattern VERT pattern BRPAR { Const("@cons", [$2; $4]) }
+
+nilpat:
+	| BLPAR BRPAR { Const("@nil",[]) }
+
+
+listpat:
+	| BLPAR listrest { $2 }
+	
+listrest:
+	| pattern BRPAR { Const("@cons", [$1; Const("@nil",[])]) }
+	| pattern COMMA listrest { Const("@cons", [$1; $3]) }
+
+
+
+

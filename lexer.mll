@@ -22,6 +22,7 @@ rule token = parse
 | ","         { Parser.COMMA   }
 | "["         { Parser.BLPAR   }
 | "]"         { Parser.BRPAR   }
+| "|"         { Parser.VERT    }
 | "'"         { Parser.QUOTE   }
 | eof         { Parser.EOF     }
 | plfile as s { Parser.FILENAME s }
