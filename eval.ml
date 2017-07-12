@@ -4,13 +4,12 @@ open Parser
 open Lexer
 
 
-
-
 let rec load s env = 
 	"", s @ env
 
 
-let subst_assoc a b = List.append b a
+
+let subst_assoc a b = List.append a b
 
 
 let rec listpattern2list pa = 
@@ -94,7 +93,8 @@ let rec print_subst sub =
 let rec subst_pattern (fr,tot) pa =
 	match pa with
 	| Const(na,xs) -> Const(na,List.map (fun p -> subst_pattern (fr,tot) p) xs)
-	| Param x -> if x = fr then tot else pa
+	| Param x -> if x = "_" then pa (* 変数_だけは、そのまま書き換えないようにする *)
+		else if x = fr then tot else pa
 
 let rec subst_pattern_rec sub pa = 
 	match sub with
@@ -140,12 +140,15 @@ let subst_envs sub es = List.map (fun x -> subst_decl sub x) es
 
 
 let rec unify_pattern : pattern -> pattern -> subst option = fun x -> fun y -> 
-	(* print_string " x .. ";
+	(* 
+	print_string " x .. ";
 	print_pattern x;
 	print_string "  y .. ";
 	print_pattern y;
-	print_newline (); *)
+	print_newline ();
+	*)
 	match x,y with
+	| Param "_",_ | _,Param "_" -> Some [] (* _ の場合は置換を追加せずに通過させる *)
 	| Param a, b | b,Param a -> Some [(a,b)] (* とりあえず、出現チェックをしない *)
 	| Const (x,xs), Const(y,ys) -> 
 		if x = y then unify_patterns xs ys else None
@@ -159,7 +162,7 @@ and unify_patterns (vx : pattern list) vy =
 		 | Some s1 -> 
 		 	match unify_patterns (subst_patterns s1 xs) (subst_patterns s1 ys) with
 		 	| None -> None
-		 	| Some s2 -> Some (subst_assoc s1 s2))
+		 	| Some s2 -> Some (subst_assoc s2 s1))
 	| _ -> None
 
 (*
@@ -185,7 +188,7 @@ let gen_var =
 
 let fleshen_decl decl = 
 	let fvs = find_decl_fvs decl in
-	let sub = List.map (fun x -> (x,Param("$" ^ (string_of_int (gen_var ())) ^ x))) fvs in
+	let sub = List.map (fun x -> (x,Param("$" ^ (x ^ (string_of_int (gen_var ())))))) fvs in
 		subst_decl sub decl
 
 (*
@@ -194,7 +197,7 @@ let fleshen_decl decl =
 *)
 
 let rec iter_dfs (funs: func list) (subst : subst) (env :env) cont = 
-	
+	(*
 	print_subst subst;
 	print_newline ();
 	print_string (string_of_int (List.length funs));
@@ -202,7 +205,7 @@ let rec iter_dfs (funs: func list) (subst : subst) (env :env) cont =
 	print_funcs funs;
 	print_newline ();
 	print_newline (); 
-	
+	*)
 	match funs with
 	| [] -> cont subst
 	| (fn,fvs) :: xs -> 
@@ -218,7 +221,7 @@ let rec iter_dfs (funs: func list) (subst : subst) (env :env) cont =
 						(* print_string "subst!![\n";
 						print_subst tsub;
 						print_string "\n]\n"; *)
-						iter_dfs ((subst_funcs tsub asps) @ xs) (subst_assoc tsub subst) env cont
+						iter_dfs (subst_funcs tsub (asps @ xs)) (subst_assoc tsub subst) env cont
 				else ());
 					itersearch renv
 		in

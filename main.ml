@@ -1,6 +1,8 @@
 open Syntax
 open Eval
 
+
+
 let rec repl env = 
 	print_string "?- ";
 	flush stdout;
