@@ -81,6 +81,7 @@ let print_decl (d,bd) =
 let print_env env = 
 	List.iter print_decl env
 
+
 let rec print_subst sub = 
 	match sub with
 	| [] -> ()
@@ -234,8 +235,9 @@ let rec query fn env =
 	try
 		iter_dfs [fn] [] env (fun sub-> 
 			let ts = extract_subst sub fn in
+			print_string "[ ";
 			print_subst ts;
-			print_string "\nAny more? ";
+			print_string " ]\nAny more? ";
 			flush stdout;
 			let s = read_line () in
 				if s = ";" then () 
