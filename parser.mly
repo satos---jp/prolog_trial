@@ -19,6 +19,7 @@
 %token EOF
 %token LIST
 %token VERT
+%token CUT
 
 %start repl decls
 %type <Syntax.direct> repl
@@ -28,12 +29,12 @@
 
 repl:
 	| directive COLON { $1 }
-	| func COLON      { Query($1) }
+	| funcs COLON      { Query($1) }
 	| EOF  { Quit }
 
 directive:
 	| BLPAR QUOTE FILENAME QUOTE BRPAR { Load($3) }
-	| LIST { List }
+	| LIST { List }	
 
 
 decls:
@@ -42,12 +43,16 @@ decls:
 
 decl:
 	| func COLON          { ($1,[]) }
-	| func IF funcs COLON { ($1,$3) }
+	| func IF funcs COLON { ($1,[]) }
 
 funcs:
-	| func      { [$1] }
-	| func COMMA funcs { $1 :: $3 }
+	| func_with_cut      { ([]:func_with_cut list) }
+	| func_with_cut COMMA funcs { (($1 :: $3):func_with_cut list) }
 
+func_with_cut:
+	| func { Func($1) }
+	| CUT  { Cut(-1) }
+	
 func:
 	| CONST LPAR pattern funcrest { ($1,$3 :: $4) }
 

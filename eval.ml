@@ -117,25 +117,36 @@ let rec unique v =
 			if List.mem x rv then rv else (x :: rv)
 
 
-
-let rec find_func_fvs (fn,xs) = 
+let find_func_fvs (_,xs) = 
 	unique (List.flatten (List.map find_pat_fvs xs))
 
-let extract_subst sub func = 
+let rec find_func_cut_fvs fc = 
+	match fc with
+	| Func(f) -> find_func_fvs f
+	| Cut _ -> []
+	
+let extract_subst sub (func :func) = 
 	let fvs = find_func_fvs func in
 		List.map (fun x -> (x,subst_pattern_rec sub (Param(x)))) fvs
 
-let rec find_decl_fvs (fn,xs) = 
-	unique ((find_func_fvs fn) @ (List.flatten (List.map find_func_fvs xs)))
+let rec find_decl_fvs ((fn,xs) : decl)  = 
+	unique ((find_func_fvs fn) @ (List.flatten (List.map find_func_cut_fvs xs)))
 
 
 let subst_patterns sub (pas : pattern list) = List.map (fun pa -> subst_pattern_rec sub pa) pas
 
-let subst_func sub ((na,bo) : func) = (na,subst_patterns sub bo)
 
-let subst_funcs sub (prs : func list) = List.map (fun x -> subst_func sub x) prs
+let subst_func sub (na,bo) = 
+	(na,subst_patterns sub bo)
 
-let subst_decl sub ((f,ds) : decl) = (subst_func sub f,subst_funcs sub ds)
+let subst_func_cut sub (fc : func_with_cut) = 
+	match fc with
+	| Func(f) -> Func(subst_func sub f)
+	| Cut x -> Cut x
+
+let subst_funcs sub (prs : func_with_cut list) = List.map (fun x -> subst_func_cut sub x) prs
+
+let subst_decl (sub:subst) ((f,ds) : decl) = (subst_func sub f,subst_funcs sub ds)
 
 let subst_envs sub es = List.map (fun x -> subst_decl sub x) es
 
@@ -187,7 +198,7 @@ let rec unify_funcs vx vy =
 let gen_var =
 	let c = ref 0 in (fun () -> (c := (!c) + 1; !c))
 
-let fleshen_decl decl = 
+let fleshen_decl (decl : decl) = 
 	let fvs = find_decl_fvs decl in
 	let sub = List.map (fun x -> (x,Param("$" ^ (x ^ (string_of_int (gen_var ())))))) fvs in
 		subst_decl sub decl
@@ -197,7 +208,7 @@ let fleshen_decl decl =
 Œp‘±“n‚µ‚É‚µ‚ÄA‚»‚Ì’†‚Åexception‚ðŒÄ‚ñ‚Å‚à‚ç‚¨‚¤A‚ÆB
 *)
 
-let rec iter_dfs (funs: func list) (subst : subst) (env :env) cont = 
+let rec iter_dfs (funs: func_with_cut list) (subst : subst) (env :env) cont = 
 	(*
 	print_subst subst;
 	print_newline ();
@@ -209,7 +220,7 @@ let rec iter_dfs (funs: func list) (subst : subst) (env :env) cont =
 	*)
 	match funs with
 	| [] -> cont subst
-	| (fn,fvs) :: xs -> 
+	| (Func(fn,fvs)) :: xs -> 
 		let rec itersearch : env -> unit = fun nenv ->
 			match nenv with
 			| [] -> ()
