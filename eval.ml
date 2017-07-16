@@ -84,14 +84,19 @@ let print_env env =
 	List.iter print_decl env
 
 
+
 let rec print_subst sub = 
 	match sub with
-	| [] -> ()
+	| [] -> print_string  "true."
 	| (s,x) :: xs -> 
+		print_string "[ ";
 		print_string (s ^ " ::= ");
 		print_pattern x;
-		print_string ", ";
-		print_subst xs
+		List.iter (fun (ns,nx) -> 
+			print_string ", ";
+			print_string (ns ^ " ::= ");
+			print_pattern nx) xs;
+		print_string " ]"
 
 let rec subst_pattern (fr,tot) pa =
 	match pa with
@@ -120,7 +125,7 @@ let rec unique v =
 
 
 let find_func_fvs (_,xs) = 
-	unique (List.flatten (List.map find_pat_fvs xs))
+	List.flatten (List.map find_pat_fvs xs)
 
 let rec find_func_cut_fvs fc = 
 	match fc with
@@ -132,7 +137,7 @@ let extract_subst sub (funcs :func_with_cut list) =
 		match f with
 		| Func(x) -> (find_func_fvs x) @ s
 		| Cut _ -> s) [] funcs in
-		List.map (fun x -> (x,subst_pattern_rec sub (Param(x)))) fvs
+	List.map (fun x -> (x,subst_pattern_rec sub (Param(x)))) (unique fvs)
 
 let rec find_decl_fvs ((fn,xs) : decl)  = 
 	unique ((find_func_fvs fn) @ (List.flatten (List.map find_func_cut_fvs xs)))
@@ -151,7 +156,7 @@ let subst_func_cut sub (fc : func_with_cut) cutnum =
 
 let subst_funcs sub (prs : func_with_cut list) cutnum = List.map (fun x -> subst_func_cut sub x cutnum) prs
 
-let subst_decl (sub:subst) ((f,ds) : decl) cutnum = (cutnum,subst_func sub f,subst_funcs sub ds cutnum)
+let subst_decl (sub:subst) ((f,ds) : decl) cutnum = (subst_func sub f,subst_funcs sub ds cutnum)
 
 let subst_envs sub es = List.map (fun x -> subst_decl sub x) es
 
@@ -186,10 +191,9 @@ and unify_patterns (vx : pattern list) vy =
 let gen_var =
 	let c = ref 0 in (fun () -> (c := (!c) + 1; !c))
 
-let fleshen_decl (decl : decl) = 
+let fleshen_decl (decl : decl) cutnum = 
 	let fvs = find_decl_fvs decl in
 	let sub = List.map (fun x -> (x,Param("$" ^ (x ^ (string_of_int (gen_var ())))))) fvs in
-	let cutnum = (gen_var ()) in
 		subst_decl sub decl cutnum
 
 (*
@@ -212,12 +216,13 @@ let rec iter_dfs (funs: func_with_cut list) (subst : subst) (env :env) cont =
 	match funs with
 	| [] -> cont subst
 	| (Func(fn,fvs)) :: xs -> 
-		let rec itersearch : env -> unit = fun nenv ->
-			match nenv with
-			| [] -> ()
-			| decl :: renv ->
-				let (cutnum,(k,vs),asps) = fleshen_decl decl in
-				try 
+		let cutnum = gen_var () in
+		(try 
+			let rec itersearch : env -> unit = fun nenv ->
+				match nenv with
+				| [] -> ()
+				| decl :: renv ->
+					let ((k,vs),asps) = fleshen_decl decl cutnum in
 					(if k = fn then
 						match unify_patterns fvs vs with
 						| None -> ()
@@ -228,10 +233,10 @@ let rec iter_dfs (funs: func_with_cut list) (subst : subst) (env :env) cont =
 								iter_dfs (subst_funcs tsub (asps @ xs) (-1)) (subst_assoc tsub subst) env cont
 					else ());
 						itersearch renv
-				with
-					| Cut_at(tcn) -> if tcn = cutnum then () else raise (Cut_at tcn) (* cutnum”Ô–Ú‚Ì‚à‚Ì‚¾‚¯‰ñŽû *)
-		in
-			itersearch env
+			in
+				itersearch env
+		with
+			| Cut_at(tcn) -> if tcn = cutnum then () else raise (Cut_at tcn)) (* cutnum”Ô–Ú‚Ì‚à‚Ì‚¾‚¯‰ñŽû *)
 	| ((Cut(x)) :: xs) -> 
 		iter_dfs xs subst env cont;
 		(* Printf.printf "cut at %d\n" x; *)
@@ -243,12 +248,7 @@ let rec query fns env =
 	try
 		iter_dfs fns [] env (fun sub-> 
 			let ts = extract_subst sub fns in
-			(if ts = [] then 
-				print_string  "true." 
-			 else 
-				print_string "[ ";
-				print_subst ts;
-				print_string " ]");
+			print_subst ts;
 			print_string "\nAny more? ";
 			flush stdout;
 			let s = read_line () in
