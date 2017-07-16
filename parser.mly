@@ -43,18 +43,19 @@ decls:
 
 decl:
 	| func COLON          { ($1,[]) }
-	| func IF funcs COLON { ($1,[]) }
+	| func IF funcs COLON { ($1,$3) }
 
 funcs:
-	| func_with_cut      { ([]:func_with_cut list) }
-	| func_with_cut COMMA funcs { (($1 :: $3):func_with_cut list) }
+	| func_with_cut      { [$1] }
+	| func_with_cut COMMA funcs { $1 :: $3 }
 
 func_with_cut:
 	| func { Func($1) }
 	| CUT  { Cut(-1) }
-	
+
 func:
 	| CONST LPAR pattern funcrest { ($1,$3 :: $4) }
+	| CONST { ($1,[]) }
 
 funcrest:
 	| RPAR  { [] }

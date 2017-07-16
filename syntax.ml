@@ -18,7 +18,7 @@ type subst = (string * pattern) list
 type direct = 
 	| Load of string
 	| List
-	| Query of func
+	| Query of func_with_cut list
 	| Quit
 
 

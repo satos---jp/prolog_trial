@@ -67,7 +67,11 @@ let print_func (na,pas) =
 		List.iter (fun p -> print_string ","; print_pattern p) xs;
 		print_string ")" 
 
-let print_funcs = List.iter (fun f -> print_func f; print_string ", ")
+let print_func_with_cut fc = 
+	match fc with
+	| Func(f) -> print_func f
+	| Cut _ -> print_string "!"
+
 
 let print_decl (d,bd) = 
 	print_func d;
@@ -75,7 +79,7 @@ let print_decl (d,bd) =
 		print_string ".\n"
 	else (
 		print_string " :- ";
-		List.iter print_func bd;
+		List.iter print_func_with_cut bd;
 		print_string ".\n")
 
 let print_env env = 
@@ -125,8 +129,11 @@ let rec find_func_cut_fvs fc =
 	| Func(f) -> find_func_fvs f
 	| Cut _ -> []
 	
-let extract_subst sub (func :func) = 
-	let fvs = find_func_fvs func in
+let extract_subst sub (funcs :func_with_cut list) = 
+	let fvs = List.fold_left (fun s -> fun f -> 
+		match f with
+		| Func(x) -> (find_func_fvs x) @ s
+		| Cut _ -> s) [] funcs in
 		List.map (fun x -> (x,subst_pattern_rec sub (Param(x)))) fvs
 
 let rec find_decl_fvs ((fn,xs) : decl)  = 
@@ -139,14 +146,14 @@ let subst_patterns sub (pas : pattern list) = List.map (fun pa -> subst_pattern_
 let subst_func sub (na,bo) = 
 	(na,subst_patterns sub bo)
 
-let subst_func_cut sub (fc : func_with_cut) = 
+let subst_func_cut sub (fc : func_with_cut) cutnum = 
 	match fc with
 	| Func(f) -> Func(subst_func sub f)
-	| Cut x -> Cut x
+	| Cut x -> if x < 0 then Cut cutnum else Cut x
 
-let subst_funcs sub (prs : func_with_cut list) = List.map (fun x -> subst_func_cut sub x) prs
+let subst_funcs sub (prs : func_with_cut list) cutnum = List.map (fun x -> subst_func_cut sub x cutnum) prs
 
-let subst_decl (sub:subst) ((f,ds) : decl) = (subst_func sub f,subst_funcs sub ds)
+let subst_decl (sub:subst) ((f,ds) : decl) cutnum = (cutnum,subst_func sub f,subst_funcs sub ds cutnum)
 
 let subst_envs sub es = List.map (fun x -> subst_decl sub x) es
 
@@ -201,12 +208,15 @@ let gen_var =
 let fleshen_decl (decl : decl) = 
 	let fvs = find_decl_fvs decl in
 	let sub = List.map (fun x -> (x,Param("$" ^ (x ^ (string_of_int (gen_var ())))))) fvs in
-		subst_decl sub decl
+	let cutnum = (gen_var ()) in
+		subst_decl sub decl cutnum
 
 (*
 継続っぽいことをしないといけない
 継続渡しにして、その中でexceptionを呼んでもらおう、と。
 *)
+
+exception Cut_at of int
 
 let rec iter_dfs (funs: func_with_cut list) (subst : subst) (env :env) cont = 
 	(*
@@ -214,7 +224,7 @@ let rec iter_dfs (funs: func_with_cut list) (subst : subst) (env :env) cont =
 	print_newline ();
 	print_string (string_of_int (List.length funs));
 	print_newline ();
-	print_funcs funs;
+	List.iter print_func_with_cut funs;
 	print_newline ();
 	print_newline (); 
 	*)
@@ -225,27 +235,33 @@ let rec iter_dfs (funs: func_with_cut list) (subst : subst) (env :env) cont =
 			match nenv with
 			| [] -> ()
 			| decl :: renv ->
-				let ((k,vs),asps) = fleshen_decl decl in
-				(if k = fn then
-					match unify_patterns fvs vs with
-					| None -> ()
-					| Some tsub -> 
-						(* print_string "subst!![\n";
-						print_subst tsub;
-						print_string "\n]\n"; *)
-						iter_dfs (subst_funcs tsub (asps @ xs)) (subst_assoc tsub subst) env cont
-				else ());
-					itersearch renv
+				let (cutnum,(k,vs),asps) = fleshen_decl decl in
+				try 
+					(if k = fn then
+						match unify_patterns fvs vs with
+						| None -> ()
+						| Some tsub -> 
+							(* print_string "subst!![\n";
+							print_subst tsub;
+							print_string "\n]\n"; *)
+								iter_dfs (subst_funcs tsub (asps @ xs) (-1)) (subst_assoc tsub subst) env cont
+					else ());
+						itersearch renv
+				with
+					| Cut_at(tcn) -> if tcn = cutnum then () else raise (Cut_at tcn) (* cutnum番目のものだけ回収 *)
 		in
 			itersearch env
-
+	| ((Cut(x)) :: xs) -> 
+		iter_dfs xs subst env cont;
+		(* Printf.printf "cut at %d\n" x; *)
+		raise (Cut_at x)
 
 exception Finish_search
 
-let rec query fn env = 
+let rec query fns env = 
 	try
-		iter_dfs [fn] [] env (fun sub-> 
-			let ts = extract_subst sub fn in
+		iter_dfs fns [] env (fun sub-> 
+			let ts = extract_subst sub fns in
 			print_string "[ ";
 			print_subst ts;
 			print_string " ]\nAny more? ";
@@ -256,8 +272,16 @@ let rec query fn env =
 		print_string "false.\n" 
 	with
 		| Finish_search -> ()
+		| Cut_at(-1) -> () (* Query中のカットはここで回収される *)
 
 (*
 # load['tes.pl'].
 add(s(z),Y,Z).
+
+
+['tes.pl'].
+!,x(X),!,y(Y).
+
+!,x(X),y(Y).
+
 *)
