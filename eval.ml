@@ -7,10 +7,7 @@ open Lexer
 let rec load s env = 
 	"", s @ env
 
-
-
 let subst_assoc a b = List.append a b
-
 
 let rec listpattern2list pa = 
 	match pa with
@@ -59,10 +56,11 @@ and print_pattern pa =
 
 
 let print_func (na,pas) = 
-	print_string (na ^ "(");
+	print_string na;
 	match pas with
-	| [] -> print_string ")" 
+	| [] -> ()
 	| x :: xs -> 
+		print_string "(";
 		print_pattern x;
 		List.iter (fun p -> print_string ","; print_pattern p) xs;
 		print_string ")" 
@@ -75,7 +73,7 @@ let print_func_with_cut fc =
 
 let print_decl (d,bd) = 
 	print_func d;
-	if List.length bd = 0 then 
+	if bd = [] then 
 		print_string ".\n"
 	else (
 		print_string " :- ";
@@ -168,7 +166,8 @@ let rec unify_pattern : pattern -> pattern -> subst option = fun x -> fun y ->
 	*)
 	match x,y with
 	| Param "_",_ | _,Param "_" -> Some [] (* _ の場合は置換を追加せずに通過させる *)
-	| Param a, b | b,Param a -> Some [(a,b)] (* とりあえず、出現チェックをしない *)
+	| Param a, b | b,Param a -> 
+		if List.mem a (find_pat_fvs b) then None else Some [(a,b)] (* 出現検査する *)
 	| Const (x,xs), Const(y,ys) -> 
 		if x = y then unify_patterns xs ys else None
 
@@ -183,24 +182,6 @@ and unify_patterns (vx : pattern list) vy =
 		 	| None -> None
 		 	| Some s2 -> Some (subst_assoc s2 s1))
 	| _ -> None
-
-(*
-let rec unify_funcs vx vy = 
-	match vx,vy with
-	| [],[] -> Some []
-	| ((nx,x) :: xs),((ny,y) :: ys) -> 
-		if nx = ny then
-			(match unify_patterns x y with
-			 | None -> None
-			 | Some s1 -> 
-			 	match unify_funcs (subst_funcs s1 xs) (subst_funcs s1 ys) with
-			 	| None -> None
-			 	| Some s2 -> Some (subst_assoc s1 s2))
-		else None
-	| _ -> None
-*)
-
-
 
 let gen_var =
 	let c = ref 0 in (fun () -> (c := (!c) + 1; !c))
@@ -262,9 +243,13 @@ let rec query fns env =
 	try
 		iter_dfs fns [] env (fun sub-> 
 			let ts = extract_subst sub fns in
-			print_string "[ ";
-			print_subst ts;
-			print_string " ]\nAny more? ";
+			(if ts = [] then 
+				print_string  "true." 
+			 else 
+				print_string "[ ";
+				print_subst ts;
+				print_string " ]");
+			print_string "\nAny more? ";
 			flush stdout;
 			let s = read_line () in
 				if s = ";" then () 
