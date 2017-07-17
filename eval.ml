@@ -73,11 +73,12 @@ let print_func_with_cut fc =
 
 let print_decl (d,bd) = 
 	print_func d;
-	if bd = [] then 
-		print_string ".\n"
-	else (
+	match bd with
+	| [] -> print_string ".\n"
+	| x :: xs -> (
 		print_string " :- ";
-		List.iter print_func_with_cut bd;
+		print_func_with_cut x;
+		List.iter (fun p -> print_string ", "; print_func_with_cut p)  xs;
 		print_string ".\n")
 
 let print_env env = 
@@ -249,7 +250,7 @@ let rec query fns env =
 		iter_dfs fns [] env (fun sub-> 
 			let ts = extract_subst sub fns in
 			print_subst ts;
-			print_string "\nAny more? ";
+			(* print_string "\nAny more?"; *)
 			flush stdout;
 			let s = read_line () in
 				if s = ";" then () 

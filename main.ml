@@ -30,5 +30,8 @@ let rec repl env =
 		| Failure s -> (
 			Printf.printf "Failure(%s)\n" s;
 			repl env)
+		| Sys_error s -> (
+			Printf.printf "Sys_error(%s)\n" s;
+			repl env)
 
 let _ = repl []

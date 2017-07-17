@@ -8,7 +8,8 @@ let param = ('_' | upper) ('_' | lower | upper | digit)*
 let const = (digit | lower) ('_' | lower | upper | digit)*
 let space = ' ' | '\t' | '\r' | '\n'
 
-let plfile = (lower | upper | digit)+ ".pl" 
+let dirpath = (".." | ((lower | upper | digit | '_')+))'/'
+let plfile = dirpath* (lower | upper | digit)+ ".pl" 
 
 rule token = parse
 | space+      { token lexbuf   }
