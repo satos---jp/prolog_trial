@@ -51,7 +51,6 @@ funcs:
 
 func_with_cut:
 	| func { Func($1) }
-	| CUT  { Cut(-1) }
 
 func:
 	| CONST LPAR pattern funcrest { ($1,$3 :: $4) }

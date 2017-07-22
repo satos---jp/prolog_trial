@@ -7,7 +7,6 @@ type func = string * (pattern list)
 
 type func_with_cut = 
 	| Func of func
-	| Cut of int
 
 type decl = func * (func_with_cut list)
 
