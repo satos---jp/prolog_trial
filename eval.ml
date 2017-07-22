@@ -199,7 +199,7 @@ let fleshen_decl (decl : decl) =
 *)
 
 
-let rec iter_dfs (funs: func_with_cut list) (subst : subst) (env :env) cont = 
+let rec iter_bfs ((funs: func_with_cut list),(subst : subst)) (env :env) cont = 
 	(*
 	print_subst subst;
 	print_newline ();
@@ -210,31 +210,39 @@ let rec iter_dfs (funs: func_with_cut list) (subst : subst) (env :env) cont =
 	print_newline (); 
 	*)
 	match funs with
-	| [] -> cont subst
+	| [] -> cont subst; []
 	| (Func(fn,fvs)) :: xs -> 
-		let rec itersearch : env -> unit = fun nenv ->
+		let rec bfsmap acc nenv =
 			match nenv with
-			| [] -> ()
+			| [] -> acc
 			| decl :: renv ->
 				let ((k,vs),asps) = fleshen_decl decl in
-				(if k = fn then
+				match (if k = fn then
 					match unify_patterns fvs vs with
-					| None -> ()
+					| None -> None
 					| Some tsub -> 
 						(* print_string "subst!![\n";
 					print_subst tsub;
 						print_string "\n]\n"; *)
-							iter_dfs (subst_funcs tsub (asps @ xs)) (subst_assoc tsub subst) env cont
-				else ());
-					itersearch renv
+							Some ((subst_funcs tsub (asps @ xs)),(subst_assoc tsub subst))
+				else None) with
+				| None -> bfsmap acc renv
+				| Some afs -> bfsmap (afs :: acc) renv
 		in
-			itersearch env
+			bfsmap [] env
+
+let rec iter_bfs_rec funsubs env cont = 
+	match funsubs with
+	| [] -> ()
+	| _ -> 
+		let tfs = List.flatten (List.map (fun fsb -> iter_bfs fsb env cont) funsubs) in
+		iter_bfs_rec tfs env cont
 
 exception Finish_search
 
 let rec query fns env = 
 	try
-		iter_dfs fns [] env (fun sub-> 
+		iter_bfs_rec [(fns,[])] env (fun sub-> 
 			let ts = extract_subst sub fns in
 			print_subst ts;
 			(* print_string "\nAny more?"; *)
@@ -245,15 +253,3 @@ let rec query fns env =
 		print_string "false.\n" 
 	with
 		| Finish_search -> ()
-
-(*
-# load['tes.pl'].
-add(s(z),Y,Z).
-
-
-['tes.pl'].
-!,x(X),!,y(Y).
-
-!,x(X),y(Y).
-
-*)
